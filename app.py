@@ -1,6 +1,5 @@
 from flask import Flask, jsonify
 
-# Import blueprints (routes) so they can be registered on the app.
 from routes.single import single_bp
 from routes.batch import batch_bp
 
