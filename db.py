@@ -1,15 +1,26 @@
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
+import certifi
 import config
 
-# Connect to MongoDB using the URI from config. Connection is established
-# at import time so calling modules can use `prompts_col` and `history_col`
-# immediately. This is acceptable for small services; for larger apps you
-# might use a factory pattern to manage lifecycle more explicitly.
-client = MongoClient(config.CONFIG["MONGO_URI"])
+# Connect to MongoDB using the URI from config. We pass an explicit CA bundle
+# so Atlas TLS validation does not depend on OS cert store quirks.
+# A shorter server selection timeout helps fail fast with clearer errors.
+client = MongoClient(
+    config.CONFIG["MONGO_URI"],
+    tls=True,
+    tlsCAFile=certifi.where(),
+    serverSelectionTimeoutMS=10000,
+)
 # Use a specific default database name when none is provided in the URI.
 # This avoids ConfigurationError when the connection string lacks a database.
 db = client.get_database("flask_ai_api_db")
+
+# Trigger an early connection check so TLS/network issues are detected at startup.
+try:
+    client.admin.command("ping")
+except PyMongoError as e:
+    print(f"Warning: MongoDB connection check failed: {e}")
 
 prompts_col = db.get_collection("prompts")
 history_col = db.get_collection("history")
