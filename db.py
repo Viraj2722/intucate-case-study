@@ -27,18 +27,44 @@ history_col = db.get_collection("history")
 
 
 def seed_prompts():
-    """Ensure the Education_Prompt exists in the `prompts` collection.
+    """Seed multiple CA-focused prompts into the `prompts` collection.
 
-    We seed at startup so deployments have a sensible default prompt.
+    We seed at startup so deployments have multiple specialized templates.
     The check is idempotent to avoid duplicate inserts across restarts.
     """
+    ca_prompts = [
+        {
+            "_id": "Education_Prompt",
+            "template": "You are an expert in CA Final education. Answer the following question concisely and accurately: {{userInput}}",
+            "keywords": ["general", "default"],
+        },
+        {
+            "_id": "CA_Scoring_Prompt",
+            "template": "You are a CA Final scoring expert. Focus on pass criteria, marks, and scoring rules. Answer: {{userInput}}",
+            "keywords": ["score", "pass", "marks", "criteria", "aggregate", "percentage"],
+        },
+        {
+            "_id": "CA_Syllabus_Prompt",
+            "template": "You are a CA Final syllabus expert. Focus on subjects, groups, topics, and course structure. Answer: {{userInput}}",
+            "keywords": ["subject", "group", "syllabus", "topics", "chapter", "paper", "group 1", "group 2"],
+        },
+        {
+            "_id": "CA_Exam_Strategy_Prompt",
+            "template": "You are a CA Final exam strategy expert. Focus on attempt strategies, preparation tips, and time management. Answer: {{userInput}}",
+            "keywords": ["attempt", "strategy", "prepare", "tips", "study", "revision", "time management", "exam"],
+        },
+        {
+            "_id": "CA_Exemption_Prompt",
+            "template": "You are a CA Final exemption expert. Focus on subject exemptions, validity, and re-examination rules. Answer: {{userInput}}",
+            "keywords": ["exemption", "exempt", "validity", "re-exam", "re-attempt"],
+        },
+    ]
+    
     try:
-        existing = prompts_col.find_one({"_id": "Education_Prompt"})
-        if not existing:
-            prompts_col.insert_one({
-                "_id": "Education_Prompt",
-                "template": "You are an expert in education domain. Answer the following: {{userInput}}",
-            })
+        for prompt_doc in ca_prompts:
+            existing = prompts_col.find_one({"_id": prompt_doc["_id"]})
+            if not existing:
+                prompts_col.insert_one(prompt_doc)
     except PyMongoError as e:
         # If seeding fails (e.g., no Mongo available), log a warning and
         # continue. This avoids crashing the entire app at startup while

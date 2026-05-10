@@ -8,13 +8,19 @@ import db
 batch_bp = Blueprint("batch_bp", __name__)
 
 
-def _process_single_input(user_input, prompt_id="Education_Prompt"):
-    """Synchronous worker to process one input: build prompt, call OpenAI, save history.
+def _process_single_input(user_input, prompt_id=None):
+    """Synchronous worker to process one input: auto-select prompt, call OpenAI, save history.
 
     Why synchronous? The OpenAI Python SDK is blocking; this helper is intended
     to be executed inside a ThreadPoolExecutor so many calls can run concurrently
     without blocking Flask's main thread.
+    
+    If prompt_id is None, auto-selects best prompt based on user input keywords.
     """
+    # If prompt_id not specified, intelligently select best one
+    if prompt_id is None:
+        prompt_id = prompt_service.select_best_prompt(user_input)
+    
     final_prompt = prompt_service.get_prompt(prompt_id, user_input)
     ai_response = openai_service.call_openai(final_prompt)
     doc = history_model.build_history_doc(user_input, final_prompt, ai_response, prompt_id)
@@ -44,8 +50,6 @@ def ask_batch():
             if not isinstance(item, str) or not item.strip():
                 return jsonify({"error": f"All inputs must be non-empty strings. Bad item at index {i}"}), 400
 
-        prompt_id = "Education_Prompt"
-
         # We use ThreadPoolExecutor because the calls are blocking; choose a pool
         # size proportional to the number of inputs but bounded to avoid overload.
         max_workers = min(10, len(inputs))
@@ -56,8 +60,9 @@ def ask_batch():
             results = []
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 # Schedule all jobs with their original index to preserve order.
+                # Each input gets its own auto-selected best prompt.
                 futures = [
-                    loop.run_in_executor(executor, _process_single_input, inp, prompt_id)
+                    loop.run_in_executor(executor, _process_single_input, inp, None)
                     for inp in inputs
                 ]
 

@@ -12,7 +12,7 @@ def ask_single():
 
     Flow & reasoning:
     - Validate input early to provide clear 4xx errors for clients.
-    - Use a fixed `prompt_id` (Education_Prompt) to fetch templates from DB.
+    - Auto-select the best prompt based on user input keywords.
     - Build the final prompt by substituting user input into the template.
     - Call the OpenAI service synchronously and persist the exchange.
     - Wrap in try/except so unexpected issues produce an informative 500.
@@ -25,16 +25,17 @@ def ask_single():
         if not isinstance(user_input, str) or not user_input.strip():
             return jsonify({"error": "`userInput` is required and must be a non-empty string"}), 400
 
-        prompt_id = "Education_Prompt"
-
-        # Fetch and render the prompt template. This can raise ValueError if missing.
-        final_prompt = prompt_service.get_prompt(prompt_id, user_input)
+        # Auto-select best prompt based on user input keywords
+        final_prompt = prompt_service.get_best_prompt(user_input)
+        
+        # Determine which prompt was actually selected (for history logging)
+        selected_prompt_id = prompt_service.select_best_prompt(user_input)
 
         # Call the OpenAI API to get the AI response.
         ai_response = openai_service.call_openai(final_prompt)
 
         # Persist the interaction for auditing/analytics.
-        doc = history_model.build_history_doc(user_input, final_prompt, ai_response, prompt_id)
+        doc = history_model.build_history_doc(user_input, final_prompt, ai_response, selected_prompt_id)
         db.history_col.insert_one(doc)
 
         # Return only the AI response to the client.
